@@ -6,21 +6,31 @@ void set_map_value(pid_t *map, int x, int y, int val) {
     map[y * MAP_WIDTH + x] = val;
 }
 
-int main() {
+int main(int ac, char **av) {
+    printf("Starting program..\n");
+    t_command command = CMD_NONE;
+    if (ac != 2)
+        incorrect_usage_error();
+    else if (!strcmp(av[1], "1"))
+        command = CMD_TEAM_1;
+    else if (!strcmp(av[1], "2"))
+        command = CMD_TEAM_2;
+    else if (!strcmp(av[1], "display"))
+        command = CMD_DISPLAY;
+    else
+        incorrect_usage_error();
+
     srand(time(NULL));
 
-    memory = openSharedMemory();
+    printf("test\n");
+    memory = openSharedMemory(command);
+    printf("test1\n");
 
     int pid = getpid();
     if (memory.isCreator)
         printf("Parent PID : %d\n", pid);
     else
         printf("Child PID : %d\n", pid);
-
-    for (int i = 0 ; i < MAP_HEIGHT * MAP_WIDTH; i++) {
-        memory.game->map[i] = 0;
-    }
-    printf("Map initialized\n");
 
     if (memory.isCreator) {
         printf("Creator\n");
@@ -32,22 +42,6 @@ int main() {
         printf("Child\n");
         child_entry(&memory);
     }
-
-    // t_player players[4];
-
-    // get_players(players, msg_ids);
-
-    // int isParent = fork();
-
-    // if (!isParent) {
-    //     childLoop(players[i]);
-    //     return 0;
-    // }
-    // else {
-    //     players[i].pid = isParent;
-    //     set_map_value(map, players[i].x, players[i].y, players[i].pid);
-    // }
-    // print_map(memory.map, players);
 
     return 0;
 

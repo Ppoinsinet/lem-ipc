@@ -11,6 +11,7 @@
 #include <sys/wait.h>
 #include <semaphore.h>
 #include <sys/stat.h>
+#include <string.h>
 
 #include <sys/mman.h>
 #include <fcntl.h>
@@ -23,9 +24,16 @@
 #include <time.h>
 
 
-# define MAX_PLAYERS 4
+# define MAX_PLAYERS 2
 # define FILENAME "/tmp/sharedmemory.ppoinsin"
 # define SEMAPHORE_NAME "sharememorysemaphore.ppoinsin"
+
+typedef enum {
+    CMD_NONE,
+    CMD_TEAM_1,
+    CMD_TEAM_2,
+    CMD_DISPLAY
+} t_command;
 
 #define ANSI_GREEN "\033[0;32m"
 #define ANSI_RED "\033[0;31m"
@@ -42,16 +50,14 @@ typedef struct {
     pid_t pid;
     int team;
     int playerIndex;
-    int rank;
     char connected;
 } t_player;
 
 typedef struct {
     sem_t *semaphore;
     int shm_id;
-    int map[MAP_WIDTH * MAP_HEIGHT];
+
     t_player players[MAX_PLAYERS];
-    char dead[MAX_PLAYERS];
     pid_t connected[MAX_PLAYERS];
     unsigned char n_players;
 
@@ -61,12 +67,19 @@ typedef struct {
 } t_gameData;
 
 typedef struct {
+    int isCreator;
+    t_command command;
     t_gameData *game;
 
-    int isCreator;
-    int msg_ids[MAX_PLAYERS];
+    int playerIndex;
     int shm_id;
+    char die;
 } t_sharedMemory;
+
+typedef struct {
+    // long int type;
+    t_gameData data;
+} t_message;
 
 
 // Creator
@@ -79,26 +92,36 @@ void child_entry(t_sharedMemory *memory);
 void clear_ipc(t_sharedMemory *memory);
 
 // SHM
-t_sharedMemory openSharedMemory(void);
+t_sharedMemory openSharedMemory(t_command command);
 void shared_memory_init(t_sharedMemory *memory);
 
 // Display
-void print_map(t_sharedMemory *memory);
+void print_map(t_gameData *game);
 void display_loop(t_sharedMemory *memory);
+int display_init(t_sharedMemory *memory);
 
 // Utils
 int getRandomPosition(int max);
 int get_players_distance(t_sharedMemory *memory, t_player a, t_player b);
 int get_distance_to(int x1, int y1, int x2, int y2);
 t_coord get_closest_position(t_sharedMemory *memory, t_player from, t_player to);
-void sigint_callback(int arg);
+void player_sigint_callback(int arg);
+void display_sigint_callback(int arg);
 
 // Players
-void get_players(t_sharedMemory *memory, int msg_ids[MAX_PLAYERS]);
-t_player *player_on_tile(t_sharedMemory *memory, int x, int y, int nCheck);
+void get_players(t_sharedMemory *memory);
+t_player *player_on_tile(t_gameData *game, int x, int y, int nCheck);
 t_player *get_closest_enemy(t_sharedMemory *memory, int playerIndex);
-void player_loop(t_sharedMemory *memory, int playerIndex);
-void player_dies(t_sharedMemory *memory, int playerIndex);
+void player_loop(t_sharedMemory *memory);
+void client_dies(t_sharedMemory *memory);
+int player_init(t_sharedMemory *memory);
+
+// Errors
+void incorrect_usage_error(void);
+
+// Clients
+int is_last_client(t_sharedMemory *memory);
+int is_player(t_sharedMemory *memory);
 
 
 

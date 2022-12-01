@@ -1,4 +1,4 @@
-SRC = src/main.c src/creator.c src/ipc.c src/shm.c src/display.c src/utils.c src/players.c src/child.c src/clear.c
+SRC = src/main.c src/creator.c src/ipc.c src/shm.c src/display.c src/utils.c src/players.c src/child.c src/clear.c src/client.c src/errors.c src/signal.c
 
 OBJS = $(SRC:.c=.o)
 

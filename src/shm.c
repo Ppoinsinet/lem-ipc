@@ -1,8 +1,8 @@
 #include <lem.h>
 
-t_sharedMemory openSharedMemory() {
+t_sharedMemory openSharedMemory(t_command command) {
     int isCreator = 0;
-    int rd;
+    int rd = -2;
 
     if (access(FILENAME, F_OK)) {
         // file doesn't exist
@@ -20,10 +20,12 @@ t_sharedMemory openSharedMemory() {
         perror("ftok");
         exit(-4);
     }
-    close(rd);
+    if (rd > 1)
+        close(rd);
 
     int shm_id;
     t_sharedMemory data;
+    data.command = command;
     shm_id = shmget(key, sizeof(t_gameData), 0600 | IPC_CREAT);
     if (shm_id == -1) {
         perror("shmget");
@@ -37,6 +39,7 @@ t_sharedMemory openSharedMemory() {
         exit(-6);
     }
     data.game->shm_id = shm_id;
+    printf("Got shared memory\n");
     return data;
 }
 
@@ -46,28 +49,9 @@ void shared_memory_init(t_sharedMemory *memory) {
     memory->game->display_pid = 0;
     memory->game->display_msg_id = 0;
 
-
     memory->game->semaphore = sem_open(SEMAPHORE_NAME, IPC_CREAT, 0660, 1);
     if (memory->game->semaphore == SEM_FAILED) {
-        perror("sem_open");
+        perror("sem_open (1)");
         exit(-7);
     }
-
-    memory->game->display_msg_id = msgget(IPC_PRIVATE, 0600);
-    if (memory->game->display_msg_id == -1) {
-        perror("msgget (1)");
-        exit(3);
-    }
-
-
-    for (int i = 0; i < (MAX_PLAYERS); i++) {
-        memory->msg_ids[i] = msgget(IPC_PRIVATE, 0600);
-        if (memory->msg_ids[i] == -1) {
-            perror("msgget (2)");
-            exit(2);
-        }
-        // printf("Set message queue : %d\n", memory->msg_ids[i]);
-        memory->game->connected[i] = 0;
-    }
-    memory->game->connected[0] = getpid();
 }

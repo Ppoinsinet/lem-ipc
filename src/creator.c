@@ -6,7 +6,7 @@ static void creator_init_players(t_sharedMemory *memory) {
     printf("Initializing players..\n");
     sem_wait(memory->game->semaphore);
 
-    get_players(memory, memory->msg_ids);
+    get_players(memory);
     printf("Players initialized\n");
     memory->game->start = 1;
 
@@ -15,15 +15,27 @@ static void creator_init_players(t_sharedMemory *memory) {
 
 void creator_entry(t_sharedMemory *memory) {
     int oldCount = 0;
+    memory->playerIndex = 0;
 
-    signal(SIGINT, sigint_callback);
+    sem_wait(memory->game->semaphore);
+    if (memory->command == CMD_DISPLAY) {
+        // If creator joins as display
+        display_init(memory);
+    } else {
+        // If creator joins as player
+        player_init(memory);
+    }
+    sem_post(memory->game->semaphore);
 
     while (1) {
+        if (memory->die)
+            client_dies(memory);
+
         sem_wait(memory->game->semaphore);
 
-        int count = 1;
+        int count = 0;
         
-        for (int i = 1; i < MAX_PLAYERS; i++) {
+        for (int i = 0; i < MAX_PLAYERS; i++) {
             if (memory->game->connected[i])
                 count++;
         }
@@ -38,5 +50,9 @@ void creator_entry(t_sharedMemory *memory) {
     }
 
     creator_init_players(memory);
-    player_loop(memory, 0);
+
+    if (memory->command != CMD_DISPLAY)
+        player_loop(memory);
+    else
+        display_loop(memory);
 }
