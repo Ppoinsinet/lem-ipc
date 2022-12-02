@@ -8,6 +8,7 @@ int display_init(t_sharedMemory *memory) {
             perror("msgget (display)");
             return 1;
         }
+        printf("Display setup %d message queue\n", memory->game->display_msg_id);
         memory->playerIndex = -1;
         memory->game->display_pid = getpid();
         signal(SIGINT, display_sigint_callback);
@@ -40,6 +41,7 @@ void print_map(t_gameData *game) {
 void display_loop(t_sharedMemory *memory) {
     sem_wait(memory->game->semaphore);
     int display_msgid = memory->game->display_msg_id;
+    print_map(memory->game);
     sem_post(memory->game->semaphore);
 
     printf("Entering display loop.. on %d\n", display_msgid);

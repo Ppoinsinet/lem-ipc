@@ -10,6 +10,12 @@ void display_sigint_callback(int arg) {
 
     memory.game->display_pid = 0;
 
+    if (memory.game->display_msg_id > 0) {
+        printf("Removing display message queue %d\n", memory.game->display_msg_id);
+        msgctl(memory.game->display_msg_id, IPC_RMID, NULL);
+        memory.game->display_msg_id = 0;
+    }
+
     if (is_last_client(&memory)) {
         // Is last client connected -> Has to clear SharedMemory
         clear_ipc(&memory);

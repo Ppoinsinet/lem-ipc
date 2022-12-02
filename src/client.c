@@ -43,13 +43,15 @@ void client_dies(t_sharedMemory *memory) {
 
     if (!is_last_client(memory)) {
         // Is not last client connected -> No need to clear SharedMemory
+        printf("Client %d is not last ..\n", memory->playerIndex);
         memory->game->connected[memory->playerIndex] = 0;
-        if (memory->game->display_pid != 0)
+        // if (memory->game->display_pid != 0)
             // if (msgsnd(memory->game->display_msg_id, memory->game, sizeof(t_gameData), 0) == -1)
             //     perror("msgsnd (yo)");
         sem_post(memory->game->semaphore);
     } else {
         // Is last client connected -> Has to clear SharedMemory
+        printf("Client %d is last ..\n", memory->playerIndex);
         clear_ipc(memory);
         sem_post(memory->game->semaphore);
         sem_unlink(SEMAPHORE_NAME);

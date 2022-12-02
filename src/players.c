@@ -10,6 +10,7 @@ int player_init(t_sharedMemory *memory) {
                 perror("msgget");
                 return 3;
             }
+            printf("Player %d setup %d message queue\n", memory->playerIndex, memory->game->players[i].msg_id);
             memory->game->players[i].playerIndex = i;
 
             if (memory->command == CMD_TEAM_1)
@@ -19,6 +20,17 @@ int player_init(t_sharedMemory *memory) {
             else {
                 printf("Error player initialization -- command was %d\n", memory->command);
                 return 2;
+            }
+
+            while (1) {
+                int x = getRandomPosition(MAP_WIDTH);
+                int y = getRandomPosition(MAP_HEIGHT);
+                if (!player_on_tile(memory->game, x, y, i)) {
+                    memory->game->players[i].position.x = x;
+                    memory->game->players[i].position.y = y;
+                    printf("Player %d : %d - %d  == %d\n", i, memory->game->players[i].position.x, memory->game->players[i].position.y, memory->game->players[i].msg_id);
+                    break;
+                }
             }
 
             memory->game->connected[i] = getpid();
@@ -50,22 +62,6 @@ t_player *get_closest_enemy(t_sharedMemory *memory, int playerIndex) {
         }
     }
     return closestPlayer;
-}
-
-void get_players(t_sharedMemory *memory) {
-    printf("Getting players..\n");
-
-    for (int j = 0; j < MAX_PLAYERS;) {
-        int x = getRandomPosition(MAP_WIDTH);
-        int y = getRandomPosition(MAP_HEIGHT);
-        if (!player_on_tile(memory->game, x, y, j)) {
-            memory->game->players[j].position.x = x;
-            memory->game->players[j].position.y = y;
-            printf("Player %d : %d - %d  == %d\n", j, memory->game->players[j].position.x, memory->game->players[j].position.y, memory->game->players[j].msg_id);
-            j++;
-        }
-
-    }
 }
 
 t_player *player_on_tile(t_gameData *game, int x, int y, int nCheck) {
@@ -171,9 +167,12 @@ void player_loop(t_sharedMemory *memory) {
         // Player plays
         // printf("Player %d calculating closest enemy..\n", memory->playerIndex);
         t_player *enemy = get_closest_enemy(memory, memory->playerIndex);
-        printf("Player %d playing.. : Closest enemy = %d\n\n", memory->playerIndex, enemy ? enemy->playerIndex : -1);
-        if (enemy)
+        if (enemy) {
+            printf("Player %d playing.. : Closest enemy = %d\n\n", memory->playerIndex, enemy ? enemy->playerIndex : -1);
             move_towards_enemy(memory, &memory->game->players[memory->playerIndex], enemy);
+        } else {
+            printf("Player %d not playing..\n", memory->playerIndex);
+        }
         
         char count = 0;
         for (int i = 0; i < MAX_PLAYERS; i++) {

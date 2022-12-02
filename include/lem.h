@@ -24,7 +24,8 @@
 #include <time.h>
 
 
-# define MAX_PLAYERS 2
+# define MIN_PLAYERS 2
+# define MAX_PLAYERS (MAP_WIDTH * MAP_HEIGHT)
 # define FILENAME "/tmp/sharedmemory.ppoinsin"
 # define SEMAPHORE_NAME "sharememorysemaphore.ppoinsin"
 
@@ -109,7 +110,6 @@ void player_sigint_callback(int arg);
 void display_sigint_callback(int arg);
 
 // Players
-void get_players(t_sharedMemory *memory);
 t_player *player_on_tile(t_gameData *game, int x, int y, int nCheck);
 t_player *get_closest_enemy(t_sharedMemory *memory, int playerIndex);
 void player_loop(t_sharedMemory *memory);
