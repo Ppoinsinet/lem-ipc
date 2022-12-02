@@ -16,6 +16,8 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 
+#include <errno.h>
+
 # define IPC_RESULT_ERROR -1
 
 #include <stdio.h>
@@ -34,7 +36,7 @@ typedef enum {
     CMD_TEAM_1,
     CMD_TEAM_2,
     CMD_DISPLAY
-} t_command;
+} e_command;
 
 #define ANSI_GREEN "\033[0;32m"
 #define ANSI_RED "\033[0;31m"
@@ -55,8 +57,15 @@ typedef struct {
 } t_player;
 
 typedef struct {
+    int playerIndex;
+    char team;
+} t_mapTile;
+
+typedef struct {
     sem_t *semaphore;
     int shm_id;
+
+    t_mapTile map[MAP_WIDTH * MAP_HEIGHT];
 
     t_player players[MAX_PLAYERS];
     pid_t connected[MAX_PLAYERS];
@@ -69,7 +78,7 @@ typedef struct {
 
 typedef struct {
     int isCreator;
-    t_command command;
+    e_command command;
     t_gameData *game;
 
     int playerIndex;
@@ -77,10 +86,29 @@ typedef struct {
     char die;
 } t_sharedMemory;
 
+typedef enum {
+    MSG_NONE,
+    MSG_PLAY,
+    MSG_CONNECT,
+    MSG_DIE
+} e_displayMessageType;
+
 typedef struct {
-    // long int type;
-    t_gameData data;
-} t_message;
+    e_displayMessageType type;
+    t_mapTile map[MAP_WIDTH * MAP_HEIGHT];
+    int playerIndex; // Index of player playing
+} t_displayMessagePayload;
+
+typedef struct {
+    long type;
+    t_displayMessagePayload data;
+} t_displayMessage;
+
+
+
+// t_targetMessage {
+
+// }
 
 
 // Creator
@@ -93,11 +121,11 @@ void child_entry(t_sharedMemory *memory);
 void clear_ipc(t_sharedMemory *memory);
 
 // SHM
-t_sharedMemory openSharedMemory(t_command command);
+t_sharedMemory openSharedMemory(e_command command);
 void shared_memory_init(t_sharedMemory *memory);
 
 // Display
-void print_map(t_gameData *game);
+void print_map(t_mapTile *map);
 void display_loop(t_sharedMemory *memory);
 int display_init(t_sharedMemory *memory);
 
@@ -110,7 +138,7 @@ void player_sigint_callback(int arg);
 void display_sigint_callback(int arg);
 
 // Players
-t_player *player_on_tile(t_gameData *game, int x, int y, int nCheck);
+t_player *player_on_tile(t_gameData *game, int x, int y);
 t_player *get_closest_enemy(t_sharedMemory *memory, int playerIndex);
 void player_loop(t_sharedMemory *memory);
 void client_dies(t_sharedMemory *memory);
@@ -122,6 +150,8 @@ void incorrect_usage_error(void);
 // Clients
 int is_last_client(t_sharedMemory *memory);
 int is_player(t_sharedMemory *memory);
+
+int send_display_message(int msg_id, int player_index, int type, t_mapTile *map);
 
 
 

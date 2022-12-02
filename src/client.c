@@ -37,17 +37,24 @@ void client_dies(t_sharedMemory *memory) {
         msgctl(memory->game->display_msg_id, IPC_RMID, NULL);
     }
     else {
-        printf("Unsetting player message queue %d\n", memory->game->players[memory->playerIndex].msg_id);
-        msgctl(memory->game->players[memory->playerIndex].msg_id, IPC_RMID, NULL);
+        t_player *player = &memory->game->players[memory->playerIndex];
+        printf("Unsetting player message queue %d\n", player->msg_id);
+        msgctl(player->msg_id, IPC_RMID, NULL);
+
+        if (memory->game->map[player->position.x + player->position.y * MAP_WIDTH].playerIndex == player->playerIndex) {
+            memory->game->map[player->position.x + player->position.y * MAP_WIDTH].playerIndex = -1;
+            memory->game->map[player->position.x + player->position.y * MAP_WIDTH].team = 0;
+        }
     }
 
     if (!is_last_client(memory)) {
         // Is not last client connected -> No need to clear SharedMemory
         printf("Client %d is not last ..\n", memory->playerIndex);
         memory->game->connected[memory->playerIndex] = 0;
-        // if (memory->game->display_pid != 0)
-            // if (msgsnd(memory->game->display_msg_id, memory->game, sizeof(t_gameData), 0) == -1)
-            //     perror("msgsnd (yo)");
+        if (memory->command != CMD_DISPLAY) {
+            // If a player dies
+            send_display_message(memory->game->display_msg_id, memory->playerIndex, MSG_DIE, memory->game->map);
+        }
         sem_post(memory->game->semaphore);
     } else {
         // Is last client connected -> Has to clear SharedMemory

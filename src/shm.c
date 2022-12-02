@@ -1,6 +1,6 @@
 #include <lem.h>
 
-t_sharedMemory openSharedMemory(t_command command) {
+t_sharedMemory openSharedMemory(e_command command) {
     int isCreator = 0;
     int rd = -2;
 

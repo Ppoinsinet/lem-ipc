@@ -2,13 +2,9 @@
 
 t_sharedMemory memory;
 
-void set_map_value(pid_t *map, int x, int y, int val) {
-    map[y * MAP_WIDTH + x] = val;
-}
-
 int main(int ac, char **av) {
     printf("Starting program..\n");
-    t_command command = CMD_NONE;
+    e_command command = CMD_NONE;
     if (ac != 2)
         incorrect_usage_error();
     else if (!strcmp(av[1], "1"))

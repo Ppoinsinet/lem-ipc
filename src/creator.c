@@ -16,11 +16,17 @@ void creator_entry(t_sharedMemory *memory) {
     memory->playerIndex = 0;
 
     sem_wait(memory->game->semaphore);
+    for (int i = 0; i < MAP_WIDTH * MAP_HEIGHT; i++) {
+        memory->game->map[i].playerIndex = -1;
+        memory->game->map[i].team = 0;
+    }
+
     signal(SIGINT, player_sigint_callback);
     if (memory->command != CMD_DISPLAY) {
         // If creator joins as player
         player_init(memory);
     }
+
     
     sem_post(memory->game->semaphore);
 
