@@ -100,11 +100,26 @@ typedef struct {
 } t_displayMessagePayload;
 
 typedef struct {
-    long type;
+    int enemyIndex;
+    int distance;
+    int providerIndex;
+} t_orderMessagePayload;
+
+union messagePayload {
     t_displayMessagePayload data;
-} t_displayMessage;
+    t_orderMessagePayload order;
+};
 
+typedef struct {
+    long type;
+    union messagePayload payload;
+    // t_displayMessagePayload data;
+} t_message;
 
+typedef struct {
+    int distance;
+    t_player *enemy;
+} t_closestEnemy;
 
 // t_targetMessage {
 
@@ -136,10 +151,11 @@ int get_distance_to(int x1, int y1, int x2, int y2);
 t_coord get_closest_position(t_sharedMemory *memory, t_player from, t_player to);
 void player_sigint_callback(int arg);
 void display_sigint_callback(int arg);
+int is_there_obstacle_between(t_sharedMemory *memory, t_coord from, t_coord to);
 
 // Players
 t_player *player_on_tile(t_gameData *game, int x, int y);
-t_player *get_closest_enemy(t_sharedMemory *memory, int playerIndex);
+t_closestEnemy get_closest_enemy(t_sharedMemory *memory, int playerIndex);
 void player_loop(t_sharedMemory *memory);
 void client_dies(t_sharedMemory *memory);
 int player_init(t_sharedMemory *memory);

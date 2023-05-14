@@ -3,12 +3,12 @@
 int send_display_message(int msg_id, int player_index, int type, t_mapTile *map) {
     if (msg_id <= 0)
         return 1;
-    t_displayMessage msg;
+    t_message msg;
     msg.type = 1;
-    memcpy(msg.data.map, map, sizeof(msg.data.map));
-    msg.data.type = type;
-    msg.data.playerIndex = player_index;
-    if (msgsnd(msg_id, &msg, sizeof(msg.data), 0) == -1) {
+    memcpy(msg.payload.data.map, map, sizeof(msg.payload.data.map));
+    msg.payload.data.type = type;
+    msg.payload.data.playerIndex = player_index;
+    if (msgsnd(msg_id, &msg, sizeof(msg.payload.data), 0) == -1) {
         perror("msgsnd");
         return 1;
     }
@@ -64,17 +64,17 @@ void display_loop(t_sharedMemory *memory) {
     msgctl(display_msgid, IPC_STAT, &buf);
     printf("Message size : %lu\n", buf.msg_qbytes);
     
-    t_displayMessage msg;
+    t_message msg;
     int ret;
-    while ((ret = msgrcv(display_msgid, &msg, sizeof(msg.data), 0, 0)) != -1) {
-        if (msg.data.type == MSG_CONNECT)
-            printf("Player %d connected..\n", msg.data.playerIndex);
-        else if (msg.data.type == MSG_DIE)
-            printf("Player %d died..\n", msg.data.playerIndex);
-        else if (msg.data.type == MSG_PLAY)
-            printf("Player %d playing..\n", msg.data.playerIndex);
+    while ((ret = msgrcv(display_msgid, &msg, sizeof(msg.payload.data), 0, 0)) != -1) {
+        if (msg.payload.data.type == MSG_CONNECT)
+            printf("Player %d connected..\n", msg.payload.data.playerIndex);
+        else if (msg.payload.data.type == MSG_DIE)
+            printf("Player %d died..\n", msg.payload.data.playerIndex);
+        else if (msg.payload.data.type == MSG_PLAY)
+            printf("Player %d playing..\n", msg.payload.data.playerIndex);
         // use message queues
-        print_map(msg.data.map);
+        print_map(msg.payload.data.map);
     }
     perror("msgrcv");
     client_dies(memory);

@@ -40,7 +40,7 @@ int player_init(t_sharedMemory *memory) {
             memory->game->connected[i] = getpid();
             memory->playerIndex = i;
             signal(SIGINT, player_sigint_callback);
-            printf("Connected to game..\n");
+            printf("Connected to game..\n\n");
             
             send_display_message(memory->game->display_msg_id, i, MSG_CONNECT, memory->game->map);
 
@@ -51,10 +51,11 @@ int player_init(t_sharedMemory *memory) {
     return -1;
 }
 
-t_player *get_closest_enemy(t_sharedMemory *memory, int playerIndex) {
-    t_player *closestPlayer = NULL;
+t_closestEnemy get_closest_enemy(t_sharedMemory *memory, int playerIndex) {
     t_player *player = &memory->game->players[playerIndex];
-    int closestDist;
+    t_closestEnemy ret = {.distance = MAP_WIDTH * MAP_HEIGHT, .enemy = NULL};
+
+
     for (int i = 0; i < MAX_PLAYERS; i++) {
         if (i == playerIndex)
             continue;
@@ -62,16 +63,13 @@ t_player *get_closest_enemy(t_sharedMemory *memory, int playerIndex) {
             // If enemy
             t_player *enemy = &memory->game->players[i];
             int tmp = get_players_distance(memory, *player, *enemy);
-            if (!tmp)
-                return NULL;
-            if (closestPlayer == 0 || closestDist > tmp) {
-                closestDist = tmp;
-                closestPlayer = enemy;
-                printf("Distance to %d = %d\n", enemy->playerIndex, closestDist);
+            if (ret.distance > tmp) {
+                ret.distance = tmp;
+                ret.enemy = enemy;
             }
         }
     }
-    return closestPlayer;
+    return ret;
 }
 
 t_player *player_on_tile(t_gameData *game, int x, int y) {
@@ -83,14 +81,13 @@ t_player *player_on_tile(t_gameData *game, int x, int y) {
 
 char is_player_dead(t_sharedMemory *memory, t_player *player) {
     int count = 0;
+    printf("Checking is_player_dead for (%d, %d)\n", player->position.x, player->position.y);
 
     for (int x = -1 ; x <= 1; x++) {
-        if (x + player->position.x <= -1 || x + player->position.x >= MAP_WIDTH)
+        if ((x + player->position.x <= -1) || (x + player->position.x >= MAP_WIDTH))
             continue;
         for (int y = -1 ; y <= 1; y++) {
-            if (y + player->position.y <= -1 || y + player->position.y >= MAP_HEIGHT)
-                continue;
-            else if (x == 0 && y == 0)
+            if ((y + player->position.y <= -1) || (y + player->position.y >= MAP_HEIGHT))
                 continue;
             
             t_player *tmp = player_on_tile(memory->game, x + player->position.x, y + player->position.y);
@@ -162,14 +159,16 @@ void player_loop(t_sharedMemory *memory) {
     while (1) {
         sleep(1);
         sem_wait(memory->game->semaphore);
+        printf("Got semaphore\n");
 
-        // Player reads instructions and keeps last one
-        t_displayMessage msg;
-        int enemyIndex = -1;
+        t_closestEnemy target = {.distance = MAP_WIDTH * MAP_HEIGHT, .enemy = NULL};
+        int providerIndex = -1;
+
+        // Player reads instructions and instruction from lowest teammate index
+        t_message msg;
         ssize_t ret = 0;
 
-        (void)enemyIndex;
-        while ((ret = msgrcv(player->msg_id, &msg, sizeof(msg.data), 0, IPC_NOWAIT))) {
+        while ((ret = msgrcv(player->msg_id, &msg, sizeof(msg.payload.order), 0, IPC_NOWAIT))) {
             if (ret == -1) {
                 if (errno == ENOMSG)
                     printf("No message for player %d\n", player->playerIndex);
@@ -177,40 +176,73 @@ void player_loop(t_sharedMemory *memory) {
                     printf("An error occured during message read for player %d\n", player->playerIndex);
                 break ;
             } else if (ret > 0) {
-
+                printf("Player %d received order..\n", player->playerIndex);
+                if (msg.payload.order.enemyIndex >= 0 && (!target.enemy || msg.payload.order.providerIndex < providerIndex)) {
+                    target.enemy = &memory->game->players[msg.payload.order.enemyIndex];
+                    target.distance = msg.payload.order.distance;
+                    providerIndex = msg.payload.order.providerIndex;
+                    printf("Player %d set target to %d\n", player->playerIndex, target.enemy->playerIndex);
+                }
             }
         }
 
 
-
-        // Player checks distance with every enemies and send instructions if needed
-
-
         // Player checks if he's dead
-        // printf("Player %d checking if he's dead\n", memory->playerIndex);
+        printf("Player %d checking if he's dead\n", memory->playerIndex);
         if (is_player_dead(memory, player) || memory->die) {
             client_dies(memory);
         }
 
-        // Player plays
-        // printf("Player %d calculating closest enemy..\n", memory->playerIndex);
-        t_player *enemy = get_closest_enemy(memory, memory->playerIndex);
-        if (enemy) {
-            printf("Player %d playing.. : Closest enemy = %d\n\n", memory->playerIndex, enemy ? enemy->playerIndex : -1);
-            move_towards_enemy(memory, &memory->game->players[memory->playerIndex], enemy);
-        } else {
-            printf("Player %d not playing..\n", memory->playerIndex);
-        }
-        
-        char count = 0;
-        for (int i = 0; i < MAX_PLAYERS; i++) {
-            if (memory->game->connected[i] != 0 && memory->game->players[i].team != player->team) {
-                count++;
+        if (!target.enemy) {
+            // If player did not receive any instructions
+
+            // Player calculates closest enemy
+            // printf("Player %d calculating closest enemy..\n", memory->playerIndex);
+            target = get_closest_enemy(memory, memory->playerIndex);
+            if (!target.enemy) {
                 break;
             }
+            // printf("Closest enemy is %d\n", target.enemy->playerIndex);
+            // Player checks distance with every enemies and send instructions to subordinates if he has no instructions to follow
+            int tmpDistance;
+            int closestMateIndex = -1;
+            int closestMateDistance = MAP_WIDTH * MAP_HEIGHT;
+            for (int i = player->playerIndex + 1; i < MAX_PLAYERS; i++) {
+                if (memory->game->connected[i] != 0) {
+                    t_player *mate = &memory->game->players[i];
+
+                    if (mate->team == player->team) {
+                        tmpDistance = get_players_distance(memory, *mate, *target.enemy);
+                        if (tmpDistance < closestMateDistance) {
+                            closestMateIndex = i;
+                            closestMateDistance = tmpDistance;
+                        }
+                    }
+                }
+            }
+            if (closestMateIndex != -1) {
+                t_message msg;
+                msg.type = 1;
+                msg.payload.order.distance = closestMateDistance;
+                msg.payload.order.enemyIndex = target.enemy->playerIndex;
+                msg.payload.order.providerIndex = player->playerIndex;
+                printf("Sending to %d : 'Attack %d'\n", closestMateIndex, target.enemy->playerIndex);
+                if (msgsnd(memory->game->players[closestMateIndex].msg_id, &msg, sizeof(msg.payload.order), 0) == -1)
+                    perror("msgsnd (Sending order)");
+            }
         }
-        if (!count)
-            break;
+        printf("allo\n");
+
+
+        // Player plays
+        if (target.enemy) {
+            printf("Player %d playing.. : Closest enemy = %d\n", memory->playerIndex, target.enemy->playerIndex);
+            move_towards_enemy(memory, &memory->game->players[memory->playerIndex], target.enemy);
+        } else {
+            printf("Player %d is not playing..\n", memory->playerIndex);
+        }
+        printf("\n");
+        
         sem_post(memory->game->semaphore);
     }
     printf("Congratulations, you won the game !\n");

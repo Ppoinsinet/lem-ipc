@@ -33,12 +33,12 @@ void client_dies(t_sharedMemory *memory) {
     
     // Deletes own message queue
     if (memory->command == CMD_DISPLAY) {
-        printf("Unsetting display message queue %d\n", memory->game->display_msg_id);
+        // printf("Unsetting display message queue %d\n", memory->game->display_msg_id);
         msgctl(memory->game->display_msg_id, IPC_RMID, NULL);
     }
     else {
         t_player *player = &memory->game->players[memory->playerIndex];
-        printf("Unsetting player message queue %d\n", player->msg_id);
+        // printf("Unsetting player message queue %d\n", player->msg_id);
         msgctl(player->msg_id, IPC_RMID, NULL);
 
         if (memory->game->map[player->position.x + player->position.y * MAP_WIDTH].playerIndex == player->playerIndex) {
