@@ -17,25 +17,18 @@ int main(int ac, char **av) {
         incorrect_usage_error();
 
     srand(time(NULL));
-
-    printf("test\n");
     memory = openSharedMemory(command);
-    printf("test1\n");
 
     int pid = getpid();
-    if (memory.isCreator)
-        printf("Parent PID : %d\n", pid);
-    else
-        printf("Child PID : %d\n", pid);
-
+    shared_memory_init(&memory);
+    
     if (memory.isCreator) {
-        printf("Creator\n");
-        
-        shared_memory_init(&memory);
+        printf("Parent PID : %d\n", pid);
         creator_entry(&memory);
 
-    } else {
-        printf("Child\n");
+    }
+    else {
+        printf("Child PID : %d\n", pid);
         child_entry(&memory);
     }
 

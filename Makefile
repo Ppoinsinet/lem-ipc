@@ -6,7 +6,7 @@ NAME = lemipc
 
 CC = clang
 
-FLAGS = -Wall -Wextra -Werror
+FLAGS = -Wall -Wextra -Werror -g
 
 INCLUDE = include/
 
