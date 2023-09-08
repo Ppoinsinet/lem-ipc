@@ -1,4 +1,4 @@
-SRC = src/main.c src/creator.c src/ipc.c src/shm.c src/display.c src/utils.c src/players.c src/child.c src/clear.c src/client.c src/errors.c src/signal.c
+SRC = src/main.c src/shm.c src/display.c src/utils.c src/players.c src/errors.c src/parsing.c src/init.c src/path.c
 
 OBJS = $(SRC:.c=.o)
 
@@ -6,7 +6,7 @@ NAME = lemipc
 
 CC = clang
 
-FLAGS = -Wall -Wextra -Werror
+FLAGS = -Wall -Wextra -Werror -g
 
 INCLUDE = include/
 
