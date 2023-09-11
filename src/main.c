@@ -7,6 +7,7 @@ t_playerStatus status = {
     .isDead = 0,
     .team = -1,
     .playerIndex = -1,
+    .targetIndex = -1,
     .command = CMD_NONE,
 };
 

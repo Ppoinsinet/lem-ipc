@@ -8,8 +8,9 @@ void print_map(t_mapTile *map) {
         for (int j= 0; j < MAP_WIDTH; j++) {
 
             int index = map[j + i * MAP_WIDTH];
-            if (index >= 0)
-                printf("%s%d%s ", game->players[index].team == 1 ? ANSI_RED : ANSI_GREEN, game->players[index].team, ANSI_RESET);
+            if (index >= 0 && !game->players[index].isDead)
+                // printf("%s%d%s ", game->players[index].team == 1 ? ANSI_RED : ANSI_GREEN, game->players[index].team, ANSI_RESET);
+                printf("%s%d%s ", game->players[index].team == 1 ? ANSI_RED : ANSI_GREEN, game->players[index].playerIndex, ANSI_RESET);
             else
                 printf("- ");
         }

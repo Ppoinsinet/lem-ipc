@@ -30,6 +30,7 @@ t_gameData *openGame() {
     }
     
     key_t key = ftok(FILENAME, 0);
+    printf("key : %d\n", key);
     if (key == IPC_RESULT_ERROR)
         onError("ftok", 0);
     

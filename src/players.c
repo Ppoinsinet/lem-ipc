@@ -119,7 +119,7 @@ void emitOrder(t_closestEnemy *target) {
     }
 
     // Return if no mates
-    if (closestMateIndex == -1)
+    if (closestMateIndex == -1 || game->players[closestMateIndex].targetIndex == target->enemy->playerIndex)
         return ;
     
     // Send order
@@ -128,10 +128,10 @@ void emitOrder(t_closestEnemy *target) {
     msg.enemyIndex = target->enemy->playerIndex;
     msg.providerIndex = status.playerIndex;
     if (msgsnd(game->players[closestMateIndex].msg_id, &msg, sizeof(msg), 0) == -1) {
-        printf("Tried to send to %d\n", game->players[closestMateIndex].msg_id);
+        printf("Tried to send to %d avec %d\n", game->players[closestMateIndex].msg_id, closestMateIndex);
         perror("msgsnd (Sending order)");
     } else 
-        printf("Sent order\n");
+        printf("ORDERED %d TO ATTACK : %d\n", closestMateIndex, msg.enemyIndex);
 }
 
 t_closestEnemy readOrders() {
@@ -146,8 +146,8 @@ t_closestEnemy readOrders() {
             break ;
 
         } else if (ret > 0) {
-            printf("readOrders : %d\n", msg.enemyIndex);
             if (msg.enemyIndex >= 0 && (target.enemy || msg.providerIndex < providerIndex)) {
+                printf("ORDER - SETTING TARGET TO : %d\n", msg.enemyIndex);
                 target.enemy = &game->players[msg.enemyIndex];
                 target.distance = msg.distance;
                 providerIndex = msg.providerIndex;
@@ -220,20 +220,24 @@ void onDeath() {
     if (!msgctl(status.msg_id, IPC_RMID, NULL))
         game->players[status.playerIndex].msg_id = -1;
     
-    printf("You died\n");
     sem_post(status.semaphore);
     exit(1);
 }
 
 void onDisplayTurn() {
-    print_map(game->map);
-    game->turn = PLAYER_TURN;
-    sem_post(status.semaphore);
+    if (status.playerIndex == 0)
+        print_map(game->map);
+    else if (!kill(game->players[0].pid, 0))
+        return ;
+
+    // Executed only by creator or if creator process has ended
+
     struct timeval tmp;
     gettimeofday(&tmp, NULL);
 
     // Next turn starts in 1 second
     game->nextTurnTimestamp = (tmp.tv_sec * 1000 * 1000) + tmp.tv_usec + (1 * 1000 * 1000);
+    game->turn = PLAYER_TURN;
 }
 
 char didPlayerWin() {
@@ -251,13 +255,13 @@ void playerLoop() {
         
         sem_wait(status.semaphore);
 
-        if (game->turn == DISPLAY_TURN) {
+        if (game->finished) {
+            sem_post(status.semaphore);
+            break;
+        }
 
-            if (!status.playerIndex) {
-                // Creator (is display)
-                onDisplayTurn();
-                continue;
-            }
+        if (game->turn == DISPLAY_TURN) {
+            onDisplayTurn();
             sem_post(status.semaphore);
             continue;
         }
@@ -272,35 +276,44 @@ void playerLoop() {
 
         status = game->players[status.playerIndex];
         if (status.isDead)
-            onError("Player is dead", 1);
+            continue ;
+
+        if (status.targetIndex > -1 && game->players[status.targetIndex].isDead)
+            status.targetIndex = -1;
 
         // Player reads instructions and instruction from lowest teammate index
         t_closestEnemy target = readOrders();
 
         if (didPlayerWin()) {
+            game->finished = 1;
             sem_post(status.semaphore);
             break;
         }
         // Player checks if he's dead
-        if (isPlayerDead())
-            onDeath();
+        if (isPlayerDead()) {
+            printf("You died\n");
+            game->turn = DISPLAY_TURN;
 
-        if (!target.enemy) {
-            // If player did not receive any instructions
-            emitOrder(&target);
+            if (status.playerIndex > 0)
+                onDeath();
+            else
+                status.isDead = 1;
         }
+
+        // If player did not receive any instructions
+        emitOrder(&target);
 
         // Player plays
         if (target.enemy) {
             moveTowardsEnemy(&game->players[status.playerIndex], target.enemy);
         }
         
+        status.targetIndex = target.enemy ? target.enemy->playerIndex : -1;
         game->players[status.playerIndex] = status;
         game->turn = DISPLAY_TURN;
         sem_post(status.semaphore);
     }
 
-    game->finished = 1;
     printf("Congratulations, you won the game !\n");
     onQuit(0);
 }

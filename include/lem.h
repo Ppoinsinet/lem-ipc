@@ -60,6 +60,7 @@ typedef struct {
     int isDead;
     int team;
     int playerIndex;
+    int targetIndex;
     e_command command;
     sem_t *semaphore;
 } t_playerStatus;
