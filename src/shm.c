@@ -1,75 +1,114 @@
 #include <lem.h>
 
-key_t getKey(int rd) {
-    key_t key = ftok(FILENAME, 0);
-    printf("key %d\n", key);
-    if (key == IPC_RESULT_ERROR) {
-        perror("ftok");
-        exit(-4);
-    }
-    if (rd > -1)
-        close(rd);
-    return key;
+void *attachSharedMemory(int shm_id) {
+    void *result = shmat(shm_id, NULL, 0);
+    if (result == NULL)
+        onError("shmat", 0);
+    printf("Got shared memory\n");
+    return result;
 }
 
-t_sharedMemory openSharedMemory(e_command command) {
-    int isCreator = 0;
-    int rd = -1;
+/**
+ * @brief Fetch or create game data (shared memory)
+ * 
+ * @return t_gameData* 
+ */
+t_gameData *openGame() {
+    int rd = -2;
+
     if (access(FILENAME, F_OK)) {
         // file doesn't exist
         printf("Trying to create game..\n");
-        isCreator = 1;
-
-        if ((rd = open(FILENAME, O_CREAT)) == -1) {
-            perror("open (1)");
-            exit(2);
+        rd = open(FILENAME, O_CREAT, 0666);
+        if (rd == -1) {
+            perror("open (2)");
+            exit(-5);
         }
-    }
 
-    int shm_id;
-    t_sharedMemory data;
-    memset(&data, 0, sizeof(data));
-    data.command = command;
-    shm_id = shmget(getKey(rd), sizeof(t_gameData), 0600 | IPC_CREAT);
-    if (shm_id == -1) {
-        perror("shmget");
-        exit(-3);
+        // Define player as creator of game
+        status.playerIndex = 0;
     }
     
-    data.isCreator = isCreator;
-    data.game = shmat(shm_id, NULL, 0);
-    if (data.game == NULL) {
-        perror("shmat");
-        exit(-6);
+    key_t key = ftok(FILENAME, 0);
+    printf("key : %d\n", key);
+    if (key == IPC_RESULT_ERROR)
+        onError("ftok", 0);
+    
+    if (rd > 1)
+        close(rd);
+
+    if (!status.playerIndex) {
+        // Creator
+        status.shm_id = shmget(key, sizeof(t_gameData), 0666 | IPC_EXCL | IPC_CREAT);
+    } else {
+        // Player
+        status.shm_id = shmget(key, sizeof(t_gameData), 0666);
     }
 
-    if (isCreator)
-        memset(data.game, 0, sizeof(t_gameData));
+    if (status.shm_id == -1)
+        onError("shmget", 0);
 
-    printf("attached shared memory %p\n", data.game);
-    data.game->shm_id = shm_id;
-    printf("Got shared memory ID %d\n", data.game->shm_id);
-    return data;
+    return attachSharedMemory(status.shm_id);
 }
 
-void shared_memory_init(t_sharedMemory *memory) {
-    if (memory->isCreator) {
-        sem_unlink(SEMAPHORE_NAME);
-        memory->game->semaphore = sem_open(SEMAPHORE_NAME, O_RDWR | O_CREAT, 0644, 1);
-        if (memory->game->semaphore == SEM_FAILED) {
-            perror("sem_open (1)");
-            exit(-7);
-        }
-        if (sem_init(memory->game->semaphore, 1, 1) == -1) {
-            perror("sem_init");
-            exit(-8);
-        }
-        
-        memory->game->display_pid = 0;
-        memory->game->display_msg_id = 0;
-    } else {
-        // Not creator
-        memory->game->semaphore = sem_open(SEMAPHORE_NAME, 0);
 
+
+/**
+ * @brief Counts all players and returns when n_players >= MIN_PLAYERS
+ * 
+ */
+void waitAllPlayers() {
+    while (1) {
+        sem_wait(status.semaphore);
+        if (game->start)
+            break;
+
+        game->n_players = 0;
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            if (game->players[i].pid > 0) {
+                // Index is occupied by player
+                
+                if (!kill(game->players[i].pid, 0)) {
+                    // If process is not dead
+                    game->n_players++;
+                } else {
+                    // Player disconnected while waiting for start -> free space
+                    game->players[i].pid = 0;
+                }
+            }
+        }
+
+        printf("%d players are connected\n", game->n_players);
+        if (game->n_players >= MIN_PLAYERS) {
+            // Enough players are connected -> start game
+            printf("Starting game with %d players\n", game->n_players);
+            game->start = 1;
+        }
+        sem_post(status.semaphore);
+        sleep(2);
     }
+    sem_post(status.semaphore);
+}
+
+/**
+ * @brief Executed by creator
+ * 
+ */
+void shared_memory_init() {
+    sem_wait(status.semaphore);
+    game->start = 0;
+    game->n_players = 1;
+    game->turn = DISPLAY_TURN;
+    game->finished = 0;
+    game->nextTurnTimestamp = 0;
+
+    for (int i = 0; i < MAP_WIDTH * MAP_HEIGHT; i++) {
+        game->map[i] = -1;
+    }
+
+    game->players[0].pid = status.pid;
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        game->players[i].pid = 0;
+    }
+    sem_post(status.semaphore);
 }
