@@ -22,7 +22,6 @@ int main(int ac, char **av) {
     game = openGame();
 
     initSemaphore();
-    signal(SIGINT, onQuit);
     if (!status.playerIndex) {
         // Is creator of game
         initCreator();

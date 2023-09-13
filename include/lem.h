@@ -129,11 +129,17 @@ void initPlayer();
 
 void waitAllPlayers();
 
-void onQuit(int arg);
-
 t_coord pathFinding(t_playerStatus from, t_playerStatus to);
 t_pathFindingResult pathFindingResult(int distance, t_coord coord);
 
 t_coord get_coord(int x, int y);
+
+// Clear
+char closeMessageQueue(int id);
+char closeSharedMemory(int id);
+
+// Orders
+void emitOrder(t_closestEnemy *target);
+t_closestEnemy readOrders();
 
 #endif
